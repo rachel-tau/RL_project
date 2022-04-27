@@ -181,8 +181,11 @@ def dqn_learing(
         #####
         obs_idx = replay_buffer.store_frame(last_obs)
         encoded_obs = replay_buffer.encode_recent_observation()
-        action = select_epilson_greedy_action(Q, encoded_obs, t)
-        ## TODO: random action if the model is not initialized (buffer the buffer is not full enough) - handled by select_epilson_greedy_action???
+        # TODO: is that correct?
+        if num_param_updates == 0:
+            action = torch.IntTensor([[random.randrange(num_actions)]])
+        else:
+            action = select_epilson_greedy_action(Q, encoded_obs, t)
 
         last_obs, reward, done, info = env.step(action)
 
@@ -234,19 +237,25 @@ def dqn_learing(
 
             # # YOUR CODE HERE
             # A
-            obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
+            obs_batch, act_batch, reward_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
             # B
             obs_batch = obs_batch.to(device)
             q_batch = Q(obs_batch)
-            chosen_q_batch = q_batch[act_batch]
             assert q_batch.shape == (batch_size, num_actions)
+            # TODO: make sure it's correct
+            chosen_q_batch = q_batch[np.arange(batch_size), act_batch]
+            assert len(chosen_q_batch) == batch_size
             target_q_batch = target_Q(next_obs_batch)
             assert target_q_batch.shape == (batch_size, num_actions)
             target_v_batch = target_q_batch.max(axis=1)
+            assert len(target_v_batch) == batch_size
             target_v_batch *= done_mask
-            bellman_q_batch = rew_batch + gamma * target_v_batch
+            bellman_q_batch = reward_batch + gamma * target_v_batch
+            assert len(bellman_q_batch) == batch_size
             bellman_error = chosen_q_batch - bellman_q_batch
+            # clipping
+            # TODO: do we need to clip the reward?
             bellman_error = bellman_error if torch.abs(bellman_error) < 1 else torch.sign(bellman_error)
 
             # C
