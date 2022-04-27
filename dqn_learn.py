@@ -125,8 +125,9 @@ def dqn_learing(
     ######
 
     # YOUR CODE HERE
-    Q = q_func(input_arg, env.action_space.n)
-    target_Q = q_func(input_arg, env.action_space.n)
+    device = torch.device("cuda" if USE_CUDA else "cpu")
+    Q = q_func(input_arg, env.action_space.n).to(device)
+    target_Q = q_func(input_arg, env.action_space.n).to(device)
     ######
 
     # Construct Q network optimizer function
@@ -143,7 +144,6 @@ def dqn_learing(
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
     LOG_EVERY_N_STEPS = 10000
-    device = torch.device("cuda" if USE_CUDA else "cpu")
     for t in count():
         ### 1. Check stopping criterion
         if stopping_criterion is not None and stopping_criterion(env):
@@ -240,6 +240,8 @@ def dqn_learing(
             obs_batch, act_batch, reward_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
             # B
+            obs_batch = torch.from_numpy(obs_batch).float().to(device)
+            next_obs_batch = torch.from_numpy(next_obs_batch).float().to(device)
             obs_batch = obs_batch.to(device)
             q_batch = Q(obs_batch)
             assert q_batch.shape == (batch_size, num_actions)
@@ -248,7 +250,7 @@ def dqn_learing(
             assert len(chosen_q_batch) == batch_size
             target_q_batch = target_Q(next_obs_batch)
             assert target_q_batch.shape == (batch_size, num_actions)
-            target_v_batch = target_q_batch.max(axis=1)
+            target_v_batch = target_q_batch.max(axis=1).values
             assert len(target_v_batch) == batch_size
             target_v_batch *= done_mask
             bellman_q_batch = reward_batch + gamma * target_v_batch
