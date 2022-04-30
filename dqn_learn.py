@@ -253,10 +253,10 @@ def dqn_learing(
             target_v_batch = target_q_batch.max(axis=1).values
             assert target_v_batch.shape == (batch_size,)
             # print(target_v_batch, done_mask)
-            target_v_batch = target_v_batch.detach() * done_mask
+            target_v_batch = target_v_batch.detach() * torch.Tensor(done_mask).to(target_v_batch.device)
             # print(type(reward_batch), type(gamma), type(target_v_batch))
             #TODO: device
-            bellman_q_batch = torch.Tensor(reward_batch) + gamma * target_v_batch
+            bellman_q_batch = torch.Tensor(reward_batch).to(target_v_batch.device) + gamma * target_v_batch
             assert bellman_q_batch.shape == (batch_size,)
             bellman_error = chosen_q_batch - bellman_q_batch
             # clipping
