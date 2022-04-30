@@ -116,7 +116,7 @@ def dqn_learing(
         eps_threshold = exploration.value(t)
         if sample > eps_threshold:
             obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
-            with model.no_grad():
+            with torch.no_grad():
                 return model(Variable(obs)).data.max(1)[1].cpu()
         else:
             return torch.IntTensor([[random.randrange(num_actions)]])
@@ -247,22 +247,26 @@ def dqn_learing(
             assert q_batch.shape == (batch_size, num_actions)
             # TODO: make sure it's correct
             chosen_q_batch = q_batch[np.arange(batch_size), act_batch]
-            assert len(chosen_q_batch) == batch_size
+            assert chosen_q_batch.shape == (batch_size,)
             target_q_batch = target_Q(next_obs_batch)
             assert target_q_batch.shape == (batch_size, num_actions)
             target_v_batch = target_q_batch.max(axis=1).values
-            assert len(target_v_batch) == batch_size
-            target_v_batch *= done_mask
-            bellman_q_batch = reward_batch + gamma * target_v_batch
-            assert len(bellman_q_batch) == batch_size
+            assert target_v_batch.shape == (batch_size,)
+            # print(target_v_batch, done_mask)
+            target_v_batch = target_v_batch.detach() * done_mask
+            # print(type(reward_batch), type(gamma), type(target_v_batch))
+            #TODO: device
+            bellman_q_batch = torch.Tensor(reward_batch) + gamma * target_v_batch
+            assert bellman_q_batch.shape == (batch_size,)
             bellman_error = chosen_q_batch - bellman_q_batch
             # clipping
             # TODO: do we need to clip the reward?
-            bellman_error = bellman_error if torch.abs(bellman_error) < 1 else torch.sign(bellman_error)
+            bellman_error = torch.where(torch.abs(bellman_error) < 1, bellman_error, torch.sign(bellman_error))
 
             # C
             optimizer.zero_grad()
-            chosen_q_batch.backward(bellman_error.data.unsqeeze(1))
+            chosen_q_batch.backward(bellman_error.data)
+            # chosen_q_batch.backward(bellman_error.data.unsqueeze(1))
             optimizer.step()
 
             # D
