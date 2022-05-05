@@ -238,6 +238,8 @@ def dqn_learing(
             # # YOUR CODE HERE
             # A
             obs_batch, act_batch, reward_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
+            still_undone_mask = 1 - done_mask
+            truncated_reward_batch = torch.where(torch.abs(reward_batch) < 1, reward_batch, torch.sign(reward_batch))
 
             # B
             obs_batch = torch.from_numpy(obs_batch).float().to(device)
@@ -253,10 +255,10 @@ def dqn_learing(
             target_v_batch = target_q_batch.max(axis=1).values
             assert target_v_batch.shape == (batch_size,)
             # print(target_v_batch, done_mask)
-            target_v_batch = target_v_batch.detach() * torch.Tensor(done_mask).to(target_v_batch.device)
-            # print(type(reward_batch), type(gamma), type(target_v_batch))
+            target_v_batch = target_v_batch.detach() * torch.Tensor(still_undone_mask).to(target_v_batch.device)
+            # print(type(truncated_reward_batch), type(gamma), type(target_v_batch))
             #TODO: device
-            bellman_q_batch = torch.Tensor(reward_batch).to(target_v_batch.device) + gamma * target_v_batch
+            bellman_q_batch = torch.Tensor(truncated_reward_batch).to(target_v_batch.device) + gamma * target_v_batch
             assert bellman_q_batch.shape == (batch_size,)
             bellman_error = chosen_q_batch - bellman_q_batch
             # clipping
