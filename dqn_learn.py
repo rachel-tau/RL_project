@@ -239,7 +239,7 @@ def dqn_learing(
             # A
             obs_batch, act_batch, reward_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
             still_undone_mask = 1 - done_mask
-            truncated_reward_batch = torch.where(torch.abs(reward_batch) < 1, reward_batch, torch.sign(reward_batch))
+            truncated_reward_batch = reward_batch.clip(-1, 1)
 
             # B
             obs_batch = torch.from_numpy(obs_batch).float().to(device)
