@@ -182,13 +182,13 @@ def dqn_learing(
         obs_idx = replay_buffer.store_frame(last_obs)
         encoded_obs = replay_buffer.encode_recent_observation()
         # TODO: is that correct?
-        if num_param_updates == 0:
+        if t <= learning_starts:
             action = torch.IntTensor([[random.randrange(num_actions)]])
         else:
             action = select_epilson_greedy_action(Q, encoded_obs, t)
 
         last_obs, reward, done, info = env.step(action)
-
+        reward = max(-1.0, min(reward, 1.0))
         replay_buffer.store_effect(obs_idx, action, reward, done)
 
         if done:
@@ -238,37 +238,29 @@ def dqn_learing(
             # # YOUR CODE HERE
             # A
             obs_batch, act_batch, reward_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
-            still_undone_mask = 1 - done_mask
-            truncated_reward_batch = reward_batch.clip(-1, 1)
+            not_done_mask = 1 - done_mask
+
 
             # B
-            obs_batch = torch.from_numpy(obs_batch).float().to(device)
-            next_obs_batch = torch.from_numpy(next_obs_batch).float().to(device)
-            obs_batch = obs_batch.to(device)
+            obs_batch = torch.from_numpy(obs_batch).float().to(device) / 255.0
+            next_obs_batch = torch.from_numpy(next_obs_batch).float().to(device) / 255.0
+            reward_batch = torch.from_numpy(reward_batch).float().to(device)
             q_batch = Q(obs_batch)
             assert q_batch.shape == (batch_size, num_actions)
-            # TODO: make sure it's correct
             chosen_q_batch = q_batch[np.arange(batch_size), act_batch]
             assert chosen_q_batch.shape == (batch_size,)
-            target_q_batch = target_Q(next_obs_batch)
-            assert target_q_batch.shape == (batch_size, num_actions)
-            target_v_batch = target_q_batch.max(axis=1).values
+            target_v_batch = target_Q(next_obs_batch).detach().max(1)[0]
             assert target_v_batch.shape == (batch_size,)
-            # print(target_v_batch, done_mask)
-            target_v_batch = target_v_batch.detach() * torch.Tensor(still_undone_mask).to(target_v_batch.device)
-            # print(type(truncated_reward_batch), type(gamma), type(target_v_batch))
-            #TODO: device
-            bellman_q_batch = torch.Tensor(truncated_reward_batch).to(target_v_batch.device) + gamma * target_v_batch
+            target_v_batch = target_v_batch * not_done_mask
+            bellman_q_batch = reward_batch + gamma * target_v_batch
             assert bellman_q_batch.shape == (batch_size,)
             bellman_error = chosen_q_batch - bellman_q_batch
             # clipping
-            # TODO: do we need to clip the reward?
             bellman_error = torch.where(torch.abs(bellman_error) < 1, bellman_error, torch.sign(bellman_error))
 
             # C
             optimizer.zero_grad()
             chosen_q_batch.backward(bellman_error.data)
-            # chosen_q_batch.backward(bellman_error.data.unsqueeze(1))
             optimizer.step()
 
             # D
