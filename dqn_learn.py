@@ -238,13 +238,12 @@ def dqn_learing(
             # # YOUR CODE HERE
             # A
             obs_batch, act_batch, reward_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
-            not_done_mask = 1 - done_mask
-
 
             # B
             obs_batch = torch.from_numpy(obs_batch).float().to(device) / 255.0
             next_obs_batch = torch.from_numpy(next_obs_batch).float().to(device) / 255.0
             reward_batch = torch.from_numpy(reward_batch).float().to(device)
+            not_done_mask = torch.from_numpy(1 - done_mask).float().to(device)
             q_batch = Q(obs_batch)
             assert q_batch.shape == (batch_size, num_actions)
             chosen_q_batch = q_batch[np.arange(batch_size), act_batch]
